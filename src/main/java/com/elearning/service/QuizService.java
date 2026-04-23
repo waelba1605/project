@@ -1,15 +1,16 @@
 package com.elearning.service;
 
 import com.elearning.dto.QuizDTO;
-import com.elearning.model.entity.Lesson;
+import com.elearning.dto.QuizRequest;
 import com.elearning.model.entity.Quiz;
-import com.elearning.repository.LessonRepository;
+import com.elearning.model.entity.Lesson;
 import com.elearning.repository.QuizRepository;
+import com.elearning.repository.LessonRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,13 +26,17 @@ public class QuizService {
     @Autowired
     private ModelMapper modelMapper;
 
-    @Transactional
-    public QuizDTO createQuiz(QuizDTO quizDTO) {
-        Lesson lesson = lessonRepository.findById(quizDTO.getLessonId())
+    public QuizDTO createQuiz(QuizRequest quizRequest) {
+        Lesson lesson = lessonRepository.findById(quizRequest.getLessonId())
             .orElseThrow(() -> new RuntimeException("Lesson not found"));
 
-        Quiz quiz = modelMapper.map(quizDTO, Quiz.class);
+        Quiz quiz = new Quiz();
+        quiz.setTitle(quizRequest.getTitle());
+        quiz.setDescription(quizRequest.getDescription());
         quiz.setLesson(lesson);
+        quiz.setPassingScore(quizRequest.getPassingScore());
+        quiz.setTimeLimitMinutes(quizRequest.getTimeLimitMinutes());
+        quiz.setShowCorrectAnswers(quizRequest.getShowCorrectAnswers());
         quiz.setIsPublished(false);
 
         Quiz savedQuiz = quizRepository.save(quiz);
@@ -45,57 +50,38 @@ public class QuizService {
     }
 
     public List<QuizDTO> getQuizzesByLesson(Long lessonId) {
-        lessonRepository.findById(lessonId)
-            .orElseThrow(() -> new RuntimeException("Lesson not found"));
-
-        return quizRepository.findByLessonId(lessonId).stream()
+        List<Quiz> quizzes = quizRepository.findByLessonId(lessonId);
+        return quizzes.stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
 
-    public List<QuizDTO> getAllQuizzes() {
-        return quizRepository.findAll().stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public QuizDTO updateQuiz(Long id, QuizDTO quizDTO) {
+    public QuizDTO updateQuiz(Long id, QuizRequest quizRequest) {
         Quiz quiz = quizRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Quiz not found"));
 
-        if (quizDTO.getTitle() != null) quiz.setTitle(quizDTO.getTitle());
-        if (quizDTO.getDescription() != null) quiz.setDescription(quizDTO.getDescription());
-        if (quizDTO.getPassingScore() != null) quiz.setPassingScore(quizDTO.getPassingScore());
-        if (quizDTO.getTimeLimitMinutes() != null) quiz.setTimeLimitMinutes(quizDTO.getTimeLimitMinutes());
-        if (quizDTO.getShowCorrectAnswers() != null) quiz.setShowCorrectAnswers(quizDTO.getShowCorrectAnswers());
+        quiz.setTitle(quizRequest.getTitle());
+        quiz.setDescription(quizRequest.getDescription());
+        quiz.setPassingScore(quizRequest.getPassingScore());
+        quiz.setTimeLimitMinutes(quizRequest.getTimeLimitMinutes());
+        quiz.setShowCorrectAnswers(quizRequest.getShowCorrectAnswers());
+        quiz.setUpdatedAt(LocalDateTime.now());
 
         Quiz updatedQuiz = quizRepository.save(quiz);
         return mapToDTO(updatedQuiz);
     }
 
-    @Transactional
-    public void publishQuiz(Long id) {
+    public QuizDTO publishQuiz(Long id) {
         Quiz quiz = quizRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Quiz not found"));
-
-        if (quiz.getQuestions().isEmpty()) {
-            throw new RuntimeException("Quiz must have at least one question to be published");
-        }
 
         quiz.setIsPublished(true);
-        quizRepository.save(quiz);
+        quiz.setUpdatedAt(LocalDateTime.now());
+
+        Quiz publishedQuiz = quizRepository.save(quiz);
+        return mapToDTO(publishedQuiz);
     }
 
-    @Transactional
-    public void unpublishQuiz(Long id) {
-        Quiz quiz = quizRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Quiz not found"));
-        quiz.setIsPublished(false);
-        quizRepository.save(quiz);
-    }
-
-    @Transactional
     public void deleteQuiz(Long id) {
         Quiz quiz = quizRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Quiz not found"));
@@ -104,8 +90,8 @@ public class QuizService {
 
     private QuizDTO mapToDTO(Quiz quiz) {
         QuizDTO dto = modelMapper.map(quiz, QuizDTO.class);
-        dto.setLessonName(quiz.getLesson().getTitle());
-        dto.setQuestionCount(quiz.getQuestions().size());
+        dto.setLessonId(quiz.getLesson().getId());
+        dto.setLessonTitle(quiz.getLesson().getTitle());
         return dto;
     }
 }

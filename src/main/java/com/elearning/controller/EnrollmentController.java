@@ -20,12 +20,12 @@ public class EnrollmentController {
     @Autowired
     private EnrollmentService enrollmentService;
 
-    @PostMapping("/enroll")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
-    public ResponseEntity<?> enrollStudent(@RequestParam Long studentId, @RequestParam Long courseId) {
+    @PostMapping("/enroll/{courseId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<?> enrollCourse(@PathVariable Long courseId) {
         try {
-            EnrollmentDTO enrollment = enrollmentService.enrollStudent(studentId, courseId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(enrollment);
+            EnrollmentDTO enrollmentDTO = enrollmentService.enrollStudent(courseId);
+            return ResponseEntity.status(HttpStatus.CREATED).body(enrollmentDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -33,34 +33,16 @@ public class EnrollmentController {
         }
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getEnrollment(@PathVariable Long id) {
+    @GetMapping("/my-courses")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<?> getMyEnrollments() {
         try {
-            EnrollmentDTO enrollment = enrollmentService.getEnrollmentById(id);
-            return ResponseEntity.ok(enrollment);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-    }
-
-    @GetMapping
-    public ResponseEntity<List<EnrollmentDTO>> getAllEnrollments() {
-        List<EnrollmentDTO> enrollments = enrollmentService.getAllEnrollments();
-        return ResponseEntity.ok(enrollments);
-    }
-
-    @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
-    public ResponseEntity<?> getStudentEnrollments(@PathVariable Long studentId) {
-        try {
-            List<EnrollmentDTO> enrollments = enrollmentService.getStudentEnrollments(studentId);
+            List<EnrollmentDTO> enrollments = enrollmentService.getStudentEnrollments();
             return ResponseEntity.ok(enrollments);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 
@@ -73,50 +55,34 @@ public class EnrollmentController {
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getEnrollmentById(@PathVariable Long id) {
+        try {
+            EnrollmentDTO enrollmentDTO = enrollmentService.getEnrollmentById(id);
+            return ResponseEntity.ok(enrollmentDTO);
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-    }
-
-    @PutMapping("/{id}/progress")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
-    public ResponseEntity<?> updateProgress(@PathVariable Long id, @RequestParam Integer progressPercentage) {
-        try {
-            EnrollmentDTO enrollment = enrollmentService.updateEnrollmentProgress(id, progressPercentage);
-            return ResponseEntity.ok(enrollment);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
-
-    @PutMapping("/{id}/certificate")
-    @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> issueCertificate(@PathVariable Long id) {
-        try {
-            enrollmentService.issueCertificate(id);
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Certificate issued successfully");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
-    public ResponseEntity<?> unenrollStudent(@PathVariable Long id) {
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<?> unenrollCourse(@PathVariable Long id) {
         try {
-            enrollmentService.unenrollStudent(id);
+            enrollmentService.unenrollCourse(id);
             Map<String, String> response = new HashMap<>();
-            response.put("message", "Student unenrolled successfully");
+            response.put("message", "Unenrolled successfully");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 }

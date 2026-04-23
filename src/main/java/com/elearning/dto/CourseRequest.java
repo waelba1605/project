@@ -1,28 +1,32 @@
 package com.elearning.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CourseDTO {
-    private Long id;
+public class CourseRequest {
+    @NotBlank
     private String title;
+
     private String description;
+
+    @NotBlank
     private String courseCode;
+
     private String category;
+
     private String level;
+
     private String thumbnailUrl;
+
     private Integer durationHours;
+
     private Double price;
-    private Long instructorId;
-    private String instructorName;
-    private Boolean isPublished;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

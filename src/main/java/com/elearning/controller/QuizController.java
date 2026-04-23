@@ -1,6 +1,7 @@
 package com.elearning.controller;
 
 import com.elearning.dto.QuizDTO;
+import com.elearning.dto.QuizRequest;
 import com.elearning.service.QuizService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,10 +24,10 @@ public class QuizController {
 
     @PostMapping
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> createQuiz(@Valid @RequestBody QuizDTO quizDTO) {
+    public ResponseEntity<?> createQuiz(@Valid @RequestBody QuizRequest quizRequest) {
         try {
-            QuizDTO createdQuiz = quizService.createQuiz(quizDTO);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdQuiz);
+            QuizDTO quizDTO = quizService.createQuiz(quizRequest);
+            return ResponseEntity.status(HttpStatus.CREATED).body(quizDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -35,41 +36,35 @@ public class QuizController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getQuiz(@PathVariable Long id) {
+    public ResponseEntity<?> getQuizById(@PathVariable Long id) {
         try {
-            QuizDTO quiz = quizService.getQuizById(id);
-            return ResponseEntity.ok(quiz);
+            QuizDTO quizDTO = quizService.getQuizById(id);
+            return ResponseEntity.ok(quizDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
-    }
-
-    @GetMapping
-    public ResponseEntity<List<QuizDTO>> getAllQuizzes() {
-        List<QuizDTO> quizzes = quizService.getAllQuizzes();
-        return ResponseEntity.ok(quizzes);
     }
 
     @GetMapping("/lesson/{lessonId}")
     public ResponseEntity<?> getQuizzesByLesson(@PathVariable Long lessonId) {
         try {
-            List<QuizDTO> quizzes = quizService.getQuizzesByLesson(lessonId);
-            return ResponseEntity.ok(quizzes);
+            List<QuizDTO> quizDTOs = quizService.getQuizzesByLesson(lessonId);
+            return ResponseEntity.ok(quizDTOs);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> updateQuiz(@PathVariable Long id, @Valid @RequestBody QuizDTO quizDTO) {
+    public ResponseEntity<?> updateQuiz(@PathVariable Long id, @Valid @RequestBody QuizRequest quizRequest) {
         try {
-            QuizDTO updatedQuiz = quizService.updateQuiz(id, quizDTO);
-            return ResponseEntity.ok(updatedQuiz);
+            QuizDTO quizDTO = quizService.updateQuiz(id, quizRequest);
+            return ResponseEntity.ok(quizDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -81,25 +76,8 @@ public class QuizController {
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
     public ResponseEntity<?> publishQuiz(@PathVariable Long id) {
         try {
-            quizService.publishQuiz(id);
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Quiz published successfully");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
-
-    @PutMapping("/{id}/unpublish")
-    @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> unpublishQuiz(@PathVariable Long id) {
-        try {
-            quizService.unpublishQuiz(id);
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Quiz unpublished successfully");
-            return ResponseEntity.ok(response);
+            QuizDTO quizDTO = quizService.publishQuiz(id);
+            return ResponseEntity.ok(quizDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -118,7 +96,7 @@ public class QuizController {
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 }

@@ -1,13 +1,13 @@
 package com.elearning.controller;
 
 import com.elearning.dto.QuizResultDTO;
+import com.elearning.dto.QuizResultRequest;
 import com.elearning.service.QuizResultService;
-import com.elearning.security.UserPrincipal;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -22,13 +22,12 @@ public class QuizResultController {
     @Autowired
     private QuizResultService quizResultService;
 
-    @PostMapping("/submit")
+    @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<?> submitQuizResult(@RequestBody QuizResultDTO quizResultDTO, Authentication authentication) {
+    public ResponseEntity<?> submitQuiz(@Valid @RequestBody QuizResultRequest quizResultRequest) {
         try {
-            UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-            QuizResultDTO result = quizResultService.submitQuizResult(quizResultDTO, principal.getId());
-            return ResponseEntity.status(HttpStatus.CREATED).body(result);
+            QuizResultDTO resultDTO = quizResultService.submitQuiz(quizResultRequest);
+            return ResponseEntity.status(HttpStatus.CREATED).body(resultDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -37,10 +36,10 @@ public class QuizResultController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getQuizResult(@PathVariable Long id) {
+    public ResponseEntity<?> getResultById(@PathVariable Long id) {
         try {
-            QuizResultDTO result = quizResultService.getQuizResultById(id);
-            return ResponseEntity.ok(result);
+            QuizResultDTO resultDTO = quizResultService.getResultById(id);
+            return ResponseEntity.ok(resultDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -48,44 +47,25 @@ public class QuizResultController {
         }
     }
 
-    @GetMapping
-    public ResponseEntity<List<QuizResultDTO>> getAllQuizResults() {
-        List<QuizResultDTO> results = quizResultService.getAllQuizResults();
-        return ResponseEntity.ok(results);
-    }
-
-    @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
-    public ResponseEntity<?> getStudentQuizResults(@PathVariable Long studentId) {
+    @GetMapping("/quiz/{quizId}/my-results")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<?> getMyQuizResults(@PathVariable Long quizId) {
         try {
-            List<QuizResultDTO> results = quizResultService.getStudentQuizResults(studentId);
+            List<QuizResultDTO> results = quizResultService.getMyQuizResults(quizId);
             return ResponseEntity.ok(results);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 
-    @GetMapping("/quiz/{quizId}")
-    @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> getQuizResults(@PathVariable Long quizId) {
+    @GetMapping("/quiz/{quizId}/latest")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<?> getLatestQuizResult(@PathVariable Long quizId) {
         try {
-            List<QuizResultDTO> results = quizResultService.getQuizResults(quizId);
-            return ResponseEntity.ok(results);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-    }
-
-    @GetMapping("/student/{studentId}/quiz/{quizId}/latest")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
-    public ResponseEntity<?> getLatestQuizResult(@PathVariable Long studentId, @PathVariable Long quizId) {
-        try {
-            QuizResultDTO result = quizResultService.getLatestQuizResult(studentId, quizId);
-            return ResponseEntity.ok(result);
+            QuizResultDTO resultDTO = quizResultService.getLatestQuizResult(quizId);
+            return ResponseEntity.ok(resultDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());

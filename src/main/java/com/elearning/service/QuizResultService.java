@@ -1,16 +1,19 @@
 package com.elearning.service;
 
 import com.elearning.dto.QuizResultDTO;
-import com.elearning.model.entity.Quiz;
+import com.elearning.dto.QuizResultRequest;
 import com.elearning.model.entity.QuizResult;
+import com.elearning.model.entity.Quiz;
 import com.elearning.model.entity.User;
-import com.elearning.repository.QuizRepository;
 import com.elearning.repository.QuizResultRepository;
+import com.elearning.repository.QuizRepository;
 import com.elearning.repository.UserRepository;
+import com.elearning.security.UserPrincipal;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,85 +26,76 @@ public class QuizResultService {
     private QuizResultRepository quizResultRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private QuizRepository quizRepository;
 
     @Autowired
-    private QuizRepository quizRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private ModelMapper modelMapper;
 
-    @Transactional
-    public QuizResultDTO submitQuizResult(QuizResultDTO quizResultDTO, Long studentId) {
-        User student = userRepository.findById(studentId)
+    private UserPrincipal getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return (UserPrincipal) authentication.getPrincipal();
+    }
+
+    public QuizResultDTO submitQuiz(QuizResultRequest quizResultRequest) {
+        UserPrincipal userPrincipal = getCurrentUser();
+        User student = userRepository.findById(userPrincipal.getId())
             .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        Quiz quiz = quizRepository.findById(quizResultDTO.getQuizId())
+        Quiz quiz = quizRepository.findById(quizResultRequest.getQuizId())
             .orElseThrow(() -> new RuntimeException("Quiz not found"));
 
-        int attemptNumber = (int) quizResultRepository
-            .findByStudentIdAndQuizId(studentId, quizResultDTO.getQuizId()).size() + 1;
+        // Calculate percentage score
+        Double percentageScore = (quizResultRequest.getScore() * 100.0) / quizResultRequest.getTotalPoints();
+        Boolean isPassed = percentageScore >= quiz.getPassingScore();
 
-        double percentageScore = (double) quizResultDTO.getScore() / quizResultDTO.getTotalPoints() * 100;
+        // Get attempt number
+        List<QuizResult> previousAttempts = quizResultRepository.findByStudentIdAndQuizId(student.getId(), quiz.getId());
+        Integer attemptNumber = previousAttempts.size() + 1;
 
-        QuizResult result = QuizResult.builder()
-            .student(student)
-            .quiz(quiz)
-            .score(quizResultDTO.getScore())
-            .totalPoints(quizResultDTO.getTotalPoints())
-            .percentageScore(percentageScore)
-            .isPassed(percentageScore >= quiz.getPassingScore())
-            .attemptNumber(attemptNumber)
-            .completedAt(LocalDateTime.now())
-            .build();
+        QuizResult result = new QuizResult();
+        result.setStudent(student);
+        result.setQuiz(quiz);
+        result.setScore(quizResultRequest.getScore());
+        result.setTotalPoints(quizResultRequest.getTotalPoints());
+        result.setPercentageScore(percentageScore);
+        result.setIsPassed(isPassed);
+        result.setAttemptNumber(attemptNumber);
+        result.setCompletedAt(LocalDateTime.now());
 
         QuizResult savedResult = quizResultRepository.save(result);
         return mapToDTO(savedResult);
     }
 
-    public QuizResultDTO getQuizResultById(Long id) {
+    public QuizResultDTO getResultById(Long id) {
         QuizResult result = quizResultRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Quiz result not found"));
         return mapToDTO(result);
     }
 
-    public List<QuizResultDTO> getStudentQuizResults(Long studentId) {
-        userRepository.findById(studentId)
-            .orElseThrow(() -> new RuntimeException("Student not found"));
-
-        return quizResultRepository.findAll().stream()
-            .filter(qr -> qr.getStudent().getId().equals(studentId))
+    public List<QuizResultDTO> getMyQuizResults(Long quizId) {
+        UserPrincipal userPrincipal = getCurrentUser();
+        List<QuizResult> results = quizResultRepository.findByStudentIdAndQuizId(userPrincipal.getId(), quizId);
+        return results.stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
 
-    public List<QuizResultDTO> getQuizResults(Long quizId) {
-        quizRepository.findById(quizId)
-            .orElseThrow(() -> new RuntimeException("Quiz not found"));
-
-        return quizResultRepository.findAll().stream()
-            .filter(qr -> qr.getQuiz().getId().equals(quizId))
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
-    }
-
-    public QuizResultDTO getLatestQuizResult(Long studentId, Long quizId) {
-        QuizResult result = quizResultRepository.findTopByStudentIdAndQuizIdOrderByCreatedAtDesc(studentId, quizId)
-            .orElseThrow(() -> new RuntimeException("No quiz result found"));
+    public QuizResultDTO getLatestQuizResult(Long quizId) {
+        UserPrincipal userPrincipal = getCurrentUser();
+        QuizResult result = quizResultRepository.findTopByStudentIdAndQuizIdOrderByCreatedAtDesc(userPrincipal.getId(), quizId)
+            .orElseThrow(() -> new RuntimeException("No quiz results found"));
         return mapToDTO(result);
-    }
-
-    public List<QuizResultDTO> getAllQuizResults() {
-        return quizResultRepository.findAll().stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
     }
 
     private QuizResultDTO mapToDTO(QuizResult result) {
         QuizResultDTO dto = modelMapper.map(result, QuizResultDTO.class);
+        dto.setStudentId(result.getStudent().getId());
         dto.setStudentName(result.getStudent().getFirstName() + " " + result.getStudent().getLastName());
-        dto.setStudentEmail(result.getStudent().getEmail());
-        dto.setQuizName(result.getQuiz().getTitle());
+        dto.setQuizId(result.getQuiz().getId());
+        dto.setQuizTitle(result.getQuiz().getTitle());
         return dto;
     }
 }

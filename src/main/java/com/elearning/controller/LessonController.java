@@ -1,6 +1,7 @@
 package com.elearning.controller;
 
 import com.elearning.dto.LessonDTO;
+import com.elearning.dto.LessonRequest;
 import com.elearning.service.LessonService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,10 +24,10 @@ public class LessonController {
 
     @PostMapping
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> createLesson(@Valid @RequestBody LessonDTO lessonDTO) {
+    public ResponseEntity<?> createLesson(@Valid @RequestBody LessonRequest lessonRequest) {
         try {
-            LessonDTO createdLesson = lessonService.createLesson(lessonDTO);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdLesson);
+            LessonDTO lessonDTO = lessonService.createLesson(lessonRequest);
+            return ResponseEntity.status(HttpStatus.CREATED).body(lessonDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -35,41 +36,35 @@ public class LessonController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getLesson(@PathVariable Long id) {
+    public ResponseEntity<?> getLessonById(@PathVariable Long id) {
         try {
-            LessonDTO lesson = lessonService.getLessonById(id);
-            return ResponseEntity.ok(lesson);
+            LessonDTO lessonDTO = lessonService.getLessonById(id);
+            return ResponseEntity.ok(lessonDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
-    }
-
-    @GetMapping
-    public ResponseEntity<List<LessonDTO>> getAllLessons() {
-        List<LessonDTO> lessons = lessonService.getAllLessons();
-        return ResponseEntity.ok(lessons);
     }
 
     @GetMapping("/course/{courseId}")
     public ResponseEntity<?> getLessonsByCourse(@PathVariable Long courseId) {
         try {
-            List<LessonDTO> lessons = lessonService.getLessonsByCourse(courseId);
-            return ResponseEntity.ok(lessons);
+            List<LessonDTO> lessonDTOs = lessonService.getLessonsByCourse(courseId);
+            return ResponseEntity.ok(lessonDTOs);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> updateLesson(@PathVariable Long id, @Valid @RequestBody LessonDTO lessonDTO) {
+    public ResponseEntity<?> updateLesson(@PathVariable Long id, @Valid @RequestBody LessonRequest lessonRequest) {
         try {
-            LessonDTO updatedLesson = lessonService.updateLesson(id, lessonDTO);
-            return ResponseEntity.ok(updatedLesson);
+            LessonDTO lessonDTO = lessonService.updateLesson(id, lessonRequest);
+            return ResponseEntity.ok(lessonDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -81,25 +76,8 @@ public class LessonController {
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
     public ResponseEntity<?> publishLesson(@PathVariable Long id) {
         try {
-            lessonService.publishLesson(id);
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Lesson published successfully");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
-
-    @PutMapping("/{id}/unpublish")
-    @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> unpublishLesson(@PathVariable Long id) {
-        try {
-            lessonService.unpublishLesson(id);
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Lesson unpublished successfully");
-            return ResponseEntity.ok(response);
+            LessonDTO lessonDTO = lessonService.publishLesson(id);
+            return ResponseEntity.ok(lessonDTO);
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -118,7 +96,7 @@ public class LessonController {
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 }

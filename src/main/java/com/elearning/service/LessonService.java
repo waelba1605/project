@@ -1,15 +1,16 @@
 package com.elearning.service;
 
 import com.elearning.dto.LessonDTO;
-import com.elearning.model.entity.Course;
+import com.elearning.dto.LessonRequest;
 import com.elearning.model.entity.Lesson;
-import com.elearning.repository.CourseRepository;
+import com.elearning.model.entity.Course;
 import com.elearning.repository.LessonRepository;
+import com.elearning.repository.CourseRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,22 +26,18 @@ public class LessonService {
     @Autowired
     private ModelMapper modelMapper;
 
-    @Transactional
-    public LessonDTO createLesson(LessonDTO lessonDTO) {
-        Course course = courseRepository.findById(lessonDTO.getCourseId())
+    public LessonDTO createLesson(LessonRequest lessonRequest) {
+        Course course = courseRepository.findById(lessonRequest.getCourseId())
             .orElseThrow(() -> new RuntimeException("Course not found"));
 
-        Lesson lesson = modelMapper.map(lessonDTO, Lesson.java);
+        Lesson lesson = new Lesson();
+        lesson.setTitle(lessonRequest.getTitle());
+        lesson.setContent(lessonRequest.getContent());
+        lesson.setLessonNumber(lessonRequest.getLessonNumber());
+        lesson.setVideoUrl(lessonRequest.getVideoUrl());
+        lesson.setDurationMinutes(lessonRequest.getDurationMinutes());
         lesson.setCourse(course);
         lesson.setIsPublished(false);
-
-        if (lesson.getLessonNumber() == null) {
-            int maxLessonNumber = course.getLessons().stream()
-                .mapToInt(l -> l.getLessonNumber() != null ? l.getLessonNumber() : 0)
-                .max()
-                .orElse(0);
-            lesson.setLessonNumber(maxLessonNumber + 1);
-        }
 
         Lesson savedLesson = lessonRepository.save(lesson);
         return mapToDTO(savedLesson);
@@ -53,52 +50,38 @@ public class LessonService {
     }
 
     public List<LessonDTO> getLessonsByCourse(Long courseId) {
-        courseRepository.findById(courseId)
-            .orElseThrow(() -> new RuntimeException("Course not found"));
-
-        return lessonRepository.findByCourseIdOrderByLessonNumberAsc(courseId).stream()
+        List<Lesson> lessons = lessonRepository.findByCourseIdOrderByLessonNumberAsc(courseId);
+        return lessons.stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
 
-    public List<LessonDTO> getAllLessons() {
-        return lessonRepository.findAll().stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public LessonDTO updateLesson(Long id, LessonDTO lessonDTO) {
+    public LessonDTO updateLesson(Long id, LessonRequest lessonRequest) {
         Lesson lesson = lessonRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Lesson not found"));
 
-        if (lessonDTO.getTitle() != null) lesson.setTitle(lessonDTO.getTitle());
-        if (lessonDTO.getContent() != null) lesson.setContent(lessonDTO.getContent());
-        if (lessonDTO.getVideoUrl() != null) lesson.setVideoUrl(lessonDTO.getVideoUrl());
-        if (lessonDTO.getDurationMinutes() != null) lesson.setDurationMinutes(lessonDTO.getDurationMinutes());
-        if (lessonDTO.getLessonNumber() != null) lesson.setLessonNumber(lessonDTO.getLessonNumber());
+        lesson.setTitle(lessonRequest.getTitle());
+        lesson.setContent(lessonRequest.getContent());
+        lesson.setLessonNumber(lessonRequest.getLessonNumber());
+        lesson.setVideoUrl(lessonRequest.getVideoUrl());
+        lesson.setDurationMinutes(lessonRequest.getDurationMinutes());
+        lesson.setUpdatedAt(LocalDateTime.now());
 
         Lesson updatedLesson = lessonRepository.save(lesson);
         return mapToDTO(updatedLesson);
     }
 
-    @Transactional
-    public void publishLesson(Long id) {
+    public LessonDTO publishLesson(Long id) {
         Lesson lesson = lessonRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Lesson not found"));
+
         lesson.setIsPublished(true);
-        lessonRepository.save(lesson);
+        lesson.setUpdatedAt(LocalDateTime.now());
+
+        Lesson publishedLesson = lessonRepository.save(lesson);
+        return mapToDTO(publishedLesson);
     }
 
-    @Transactional
-    public void unpublishLesson(Long id) {
-        Lesson lesson = lessonRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Lesson not found"));
-        lesson.setIsPublished(false);
-        lessonRepository.save(lesson);
-    }
-
-    @Transactional
     public void deleteLesson(Long id) {
         Lesson lesson = lessonRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Lesson not found"));
@@ -107,8 +90,8 @@ public class LessonService {
 
     private LessonDTO mapToDTO(Lesson lesson) {
         LessonDTO dto = modelMapper.map(lesson, LessonDTO.class);
+        dto.setCourseId(lesson.getCourse().getId());
         dto.setCourseName(lesson.getCourse().getTitle());
-        dto.setQuizCount(lesson.getQuizzes().size());
         return dto;
     }
 }

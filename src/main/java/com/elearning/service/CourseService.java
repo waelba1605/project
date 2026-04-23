@@ -1,17 +1,21 @@
 package com.elearning.service;
 
 import com.elearning.dto.CourseDTO;
+import com.elearning.dto.CourseRequest;
 import com.elearning.model.entity.Course;
 import com.elearning.model.entity.User;
 import com.elearning.repository.CourseRepository;
 import com.elearning.repository.UserRepository;
+import com.elearning.security.UserPrincipal;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,16 +31,29 @@ public class CourseService {
     @Autowired
     private ModelMapper modelMapper;
 
-    @Transactional
-    public CourseDTO createCourse(CourseDTO courseDTO, Long instructorId) {
-        User instructor = userRepository.findById(instructorId)
-            .orElseThrow(() -> new RuntimeException("Instructor not found"));
+    private UserPrincipal getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return (UserPrincipal) authentication.getPrincipal();
+    }
 
-        if (courseRepository.findByCourseCode(courseDTO.getCourseCode()).isPresent()) {
+    public CourseDTO createCourse(CourseRequest courseRequest) {
+        UserPrincipal userPrincipal = getCurrentUser();
+        User instructor = userRepository.findById(userPrincipal.getId())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (courseRepository.findByCourseCode(courseRequest.getCourseCode()).isPresent()) {
             throw new RuntimeException("Course code already exists");
         }
 
-        Course course = modelMapper.map(courseDTO, Course.class);
+        Course course = new Course();
+        course.setTitle(courseRequest.getTitle());
+        course.setDescription(courseRequest.getDescription());
+        course.setCourseCode(courseRequest.getCourseCode());
+        course.setCategory(courseRequest.getCategory());
+        course.setLevel(courseRequest.getLevel());
+        course.setThumbnailUrl(courseRequest.getThumbnailUrl());
+        course.setDurationHours(courseRequest.getDurationHours());
+        course.setPrice(courseRequest.getPrice());
         course.setInstructor(instructor);
         course.setIsPublished(false);
 
@@ -50,72 +67,65 @@ public class CourseService {
         return mapToDTO(course);
     }
 
-    public List<CourseDTO> getAllCourses() {
-        return courseRepository.findAll().stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
+    public Page<CourseDTO> getAllCourses(Pageable pageable, String category) {
+        Page<Course> courses;
+        if (category != null && !category.isEmpty()) {
+            courses = courseRepository.findAll(pageable).map(course -> course.getCategory().equals(category) ? course : null)
+                .map(course -> course != null ? course : new Course());
+            // Alternative implementation
+            List<Course> categoryList = courseRepository.findByCategory(category);
+            courses = courseRepository.findAll(pageable).map(course -> 
+                categoryList.contains(course) ? course : null
+            ).filter(course -> course != null && course.getId() != null);
+        } else {
+            courses = courseRepository.findAll(pageable);
+        }
+        return courses.map(this::mapToDTO);
     }
 
-    public List<CourseDTO> getPublishedCourses() {
-        return courseRepository.findByIsPublishedTrue().stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
+    public Page<CourseDTO> getPublishedCourses(Pageable pageable) {
+        List<Course> publishedCourses = courseRepository.findByIsPublishedTrue();
+        return courseRepository.findAll(pageable)
+            .map(course -> publishedCourses.contains(course) ? course : null)
+            .filter(course -> course != null && course.getId() != null)
+            .map(this::mapToDTO);
     }
 
     public List<CourseDTO> getCoursesByInstructor(Long instructorId) {
-        userRepository.findById(instructorId)
-            .orElseThrow(() -> new RuntimeException("Instructor not found"));
-
-        return courseRepository.findByInstructorId(instructorId).stream()
+        List<Course> courses = courseRepository.findByInstructorId(instructorId);
+        return courses.stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
 
-    public List<CourseDTO> getCoursesByCategory(String category) {
-        return courseRepository.findByCategory(category).stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public CourseDTO updateCourse(Long id, CourseDTO courseDTO) {
+    public CourseDTO updateCourse(Long id, CourseRequest courseRequest) {
         Course course = courseRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Course not found"));
 
-        if (courseDTO.getTitle() != null) course.setTitle(courseDTO.getTitle());
-        if (courseDTO.getDescription() != null) course.setDescription(courseDTO.getDescription());
-        if (courseDTO.getCategory() != null) course.setCategory(courseDTO.getCategory());
-        if (courseDTO.getLevel() != null) course.setLevel(courseDTO.getLevel());
-        if (courseDTO.getThumbnailUrl() != null) course.setThumbnailUrl(courseDTO.getThumbnailUrl());
-        if (courseDTO.getDurationHours() != null) course.setDurationHours(courseDTO.getDurationHours());
-        if (courseDTO.getPrice() != null) course.setPrice(courseDTO.getPrice());
+        course.setTitle(courseRequest.getTitle());
+        course.setDescription(courseRequest.getDescription());
+        course.setCategory(courseRequest.getCategory());
+        course.setLevel(courseRequest.getLevel());
+        course.setThumbnailUrl(courseRequest.getThumbnailUrl());
+        course.setDurationHours(courseRequest.getDurationHours());
+        course.setPrice(courseRequest.getPrice());
+        course.setUpdatedAt(LocalDateTime.now());
 
         Course updatedCourse = courseRepository.save(course);
         return mapToDTO(updatedCourse);
     }
 
-    @Transactional
-    public void publishCourse(Long id) {
+    public CourseDTO publishCourse(Long id) {
         Course course = courseRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Course not found"));
-
-        if (course.getLessons().isEmpty()) {
-            throw new RuntimeException("Course must have at least one lesson to be published");
-        }
 
         course.setIsPublished(true);
-        courseRepository.save(course);
+        course.setUpdatedAt(LocalDateTime.now());
+
+        Course publishedCourse = courseRepository.save(course);
+        return mapToDTO(publishedCourse);
     }
 
-    @Transactional
-    public void unpublishCourse(Long id) {
-        Course course = courseRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Course not found"));
-        course.setIsPublished(false);
-        courseRepository.save(course);
-    }
-
-    @Transactional
     public void deleteCourse(Long id) {
         Course course = courseRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Course not found"));
@@ -124,9 +134,8 @@ public class CourseService {
 
     private CourseDTO mapToDTO(Course course) {
         CourseDTO dto = modelMapper.map(course, CourseDTO.class);
+        dto.setInstructorId(course.getInstructor().getId());
         dto.setInstructorName(course.getInstructor().getFirstName() + " " + course.getInstructor().getLastName());
-        dto.setLessonCount(course.getLessons().size());
-        dto.setEnrollmentCount(course.getEnrollments().size());
         return dto;
     }
 }
