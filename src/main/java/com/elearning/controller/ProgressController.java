@@ -1,16 +1,13 @@
 package com.elearning.controller;
 
-import com.elearning.dto.LessonProgressDTO;
+import com.elearning.dto.ProgressDTO;
 import com.elearning.service.ProgressService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/progress")
@@ -20,58 +17,31 @@ public class ProgressController {
     @Autowired
     private ProgressService progressService;
 
-    @PostMapping("/lesson/{lessonId}")
+    @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<?> markLessonAsCompleted(@PathVariable Long lessonId) {
-        try {
-            LessonProgressDTO progressDTO = progressService.markLessonAsCompleted(lessonId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(progressDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
-
-    @PutMapping("/lesson/{lessonId}")
-    @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<?> updateLessonProgress(
-            @PathVariable Long lessonId,
-            @RequestParam Integer progressPercentage,
-            @RequestParam(required = false) Integer watchedDuration) {
-        try {
-            LessonProgressDTO progressDTO = progressService.updateProgress(lessonId, progressPercentage, watchedDuration);
-            return ResponseEntity.ok(progressDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<ProgressDTO> updateProgress(@RequestBody ProgressDTO progressDTO) {
+        ProgressDTO updated = progressService.updateLessonProgress(progressDTO);
+        return ResponseEntity.ok(updated);
     }
 
     @GetMapping("/lesson/{lessonId}")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<?> getLessonProgress(@PathVariable Long lessonId) {
-        try {
-            LessonProgressDTO progressDTO = progressService.getLessonProgress(lessonId);
-            return ResponseEntity.ok(progressDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
+    public ResponseEntity<ProgressDTO> getLessonProgress(@PathVariable Long lessonId) {
+        ProgressDTO progress = progressService.getLessonProgress(lessonId);
+        return ResponseEntity.ok(progress);
     }
 
     @GetMapping("/course/{courseId}")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<?> getCourseProgress(@PathVariable Long courseId) {
-        try {
-            Map<String, Object> progress = progressService.getCourseProgress(courseId);
-            return ResponseEntity.ok(progress);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<List<ProgressDTO>> getCourseProgress(@PathVariable Long courseId) {
+        List<ProgressDTO> progress = progressService.getCourseProgress(courseId);
+        return ResponseEntity.ok(progress);
+    }
+
+    @GetMapping("/enrollment/{enrollmentId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<Integer> getEnrollmentProgress(@PathVariable Long enrollmentId) {
+        Integer progress = progressService.calculateEnrollmentProgress(enrollmentId);
+        return ResponseEntity.ok(progress);
     }
 }

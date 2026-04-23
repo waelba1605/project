@@ -8,9 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/enrollments")
@@ -20,69 +18,46 @@ public class EnrollmentController {
     @Autowired
     private EnrollmentService enrollmentService;
 
-    @PostMapping("/enroll/{courseId}")
+    @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<?> enrollCourse(@PathVariable Long courseId) {
-        try {
-            EnrollmentDTO enrollmentDTO = enrollmentService.enrollStudent(courseId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(enrollmentDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<EnrollmentDTO> enrollCourse(@RequestParam Long courseId) {
+        EnrollmentDTO enrollment = enrollmentService.enrollStudent(courseId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(enrollment);
     }
 
     @GetMapping("/my-courses")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<?> getMyEnrollments() {
-        try {
-            List<EnrollmentDTO> enrollments = enrollmentService.getStudentEnrollments();
-            return ResponseEntity.ok(enrollments);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<List<EnrollmentDTO>> getMyEnrollments() {
+        List<EnrollmentDTO> enrollments = enrollmentService.getStudentEnrollments();
+        return ResponseEntity.ok(enrollments);
     }
 
     @GetMapping("/course/{courseId}")
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> getCourseEnrollments(@PathVariable Long courseId) {
-        try {
-            List<EnrollmentDTO> enrollments = enrollmentService.getCourseEnrollments(courseId);
-            return ResponseEntity.ok(enrollments);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<List<EnrollmentDTO>> getCourseEnrollments(@PathVariable Long courseId) {
+        List<EnrollmentDTO> enrollments = enrollmentService.getCourseEnrollments(courseId);
+        return ResponseEntity.ok(enrollments);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getEnrollmentById(@PathVariable Long id) {
-        try {
-            EnrollmentDTO enrollmentDTO = enrollmentService.getEnrollmentById(id);
-            return ResponseEntity.ok(enrollmentDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
+    public ResponseEntity<EnrollmentDTO> getEnrollmentById(@PathVariable Long id) {
+        EnrollmentDTO enrollment = enrollmentService.getEnrollmentById(id);
+        return ResponseEntity.ok(enrollment);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<?> unenrollCourse(@PathVariable Long id) {
-        try {
-            enrollmentService.unenrollCourse(id);
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Unenrolled successfully");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+        enrollmentService.unenrollStudent(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<EnrollmentDTO> updateEnrollmentStatus(
+            @PathVariable Long id,
+            @RequestParam String status) {
+        EnrollmentDTO enrollment = enrollmentService.updateEnrollmentStatus(id, status);
+        return ResponseEntity.ok(enrollment);
     }
 }

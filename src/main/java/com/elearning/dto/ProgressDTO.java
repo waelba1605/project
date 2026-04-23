@@ -11,16 +11,15 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class EnrollmentDTO {
+public class ProgressDTO {
     private Long id;
     private Long studentId;
-    private String studentName;
-    private String studentEmail;
-    private Long courseId;
-    private String courseName;
-    private String enrollmentStatus;
+    private Long lessonId;
+    private String lessonTitle;
+    private Boolean isCompleted;
     private Integer progressPercentage;
-    private Boolean certificateEarned;
-    private LocalDateTime enrolledAt;
+    private Integer watchedDurationMinutes;
+    private Integer totalDurationMinutes;
+    private LocalDateTime startedAt;
     private LocalDateTime completedAt;
 }

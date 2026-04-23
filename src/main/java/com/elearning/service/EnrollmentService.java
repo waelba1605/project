@@ -1,94 +1,137 @@
 package com.elearning.service;
 
 import com.elearning.dto.EnrollmentDTO;
+import com.elearning.exception.DuplicateResourceException;
+import com.elearning.exception.ResourceNotFoundException;
+import com.elearning.exception.UnauthorizedException;
+import com.elearning.model.entity.Course;
 import com.elearning.model.entity.Enrollment;
 import com.elearning.model.entity.User;
-import com.elearning.model.entity.Course;
+import com.elearning.repository.CourseRepository;
 import com.elearning.repository.EnrollmentRepository;
 import com.elearning.repository.UserRepository;
-import com.elearning.repository.CourseRepository;
 import com.elearning.security.UserPrincipal;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class EnrollmentService {
 
     @Autowired
     private EnrollmentRepository enrollmentRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private CourseRepository courseRepository;
 
     @Autowired
-    private CourseRepository courseRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private ModelMapper modelMapper;
 
-    private UserPrincipal getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return (UserPrincipal) authentication.getPrincipal();
-    }
+    @Autowired
+    private EmailService emailService;
 
     public EnrollmentDTO enrollStudent(Long courseId) {
-        UserPrincipal userPrincipal = getCurrentUser();
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        
         User student = userRepository.findById(userPrincipal.getId())
-            .orElseThrow(() -> new RuntimeException("Student not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
 
         Course course = courseRepository.findById(courseId)
-            .orElseThrow(() -> new RuntimeException("Course not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
 
         if (enrollmentRepository.findByStudentIdAndCourseId(student.getId(), courseId).isPresent()) {
-            throw new RuntimeException("Student is already enrolled in this course");
+            throw new DuplicateResourceException("Student", "enrollment", "already exists");
         }
 
-        Enrollment enrollment = new Enrollment();
-        enrollment.setStudent(student);
-        enrollment.setCourse(course);
-        enrollment.setEnrollmentStatus("ACTIVE");
-        enrollment.setProgressPercentage(0);
-        enrollment.setCertificateEarned(false);
+        Enrollment enrollment = Enrollment.builder()
+            .student(student)
+            .course(course)
+            .enrollmentStatus("ACTIVE")
+            .progressPercentage(0)
+            .certificateEarned(false)
+            .build();
 
         Enrollment savedEnrollment = enrollmentRepository.save(enrollment);
-        return mapToDTO(savedEnrollment);
-    }
 
-    public List<EnrollmentDTO> getStudentEnrollments() {
-        UserPrincipal userPrincipal = getCurrentUser();
-        List<Enrollment> enrollments = enrollmentRepository.findByStudentId(userPrincipal.getId());
-        return enrollments.stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
-    }
+        // Send enrollment email
+        emailService.sendCourseEnrollmentEmail(
+            student.getEmail(),
+            student.getFirstName(),
+            course.getTitle()
+        );
 
-    public List<EnrollmentDTO> getCourseEnrollments(Long courseId) {
-        List<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId);
-        return enrollments.stream()
-            .map(this::mapToDTO)
-            .collect(Collectors.toList());
+        return mapToEnrollmentDTO(savedEnrollment);
     }
 
     public EnrollmentDTO getEnrollmentById(Long id) {
         Enrollment enrollment = enrollmentRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Enrollment not found"));
-        return mapToDTO(enrollment);
+            .orElseThrow(() -> new ResourceNotFoundException("Enrollment", "id", id));
+        return mapToEnrollmentDTO(enrollment);
     }
 
-    public void unenrollCourse(Long id) {
-        Enrollment enrollment = enrollmentRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Enrollment not found"));
+    public List<EnrollmentDTO> getStudentEnrollments() {
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        
+        return enrollmentRepository.findByStudentId(userPrincipal.getId()).stream()
+            .map(this::mapToEnrollmentDTO)
+            .collect(Collectors.toList());
+    }
+
+    public List<EnrollmentDTO> getCourseEnrollments(Long courseId) {
+        return enrollmentRepository.findByCourseId(courseId).stream()
+            .map(this::mapToEnrollmentDTO)
+            .collect(Collectors.toList());
+    }
+
+    public void unenrollStudent(Long enrollmentId) {
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Enrollment", "id", enrollmentId));
+
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!enrollment.getStudent().getId().equals(userPrincipal.getId())) {
+            throw new UnauthorizedException("You are not authorized to perform this action");
+        }
+
         enrollmentRepository.delete(enrollment);
     }
 
-    private EnrollmentDTO mapToDTO(Enrollment enrollment) {
+    public EnrollmentDTO updateEnrollmentStatus(Long enrollmentId, String status) {
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Enrollment", "id", enrollmentId));
+
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!enrollment.getStudent().getId().equals(userPrincipal.getId())) {
+            throw new UnauthorizedException("You are not authorized to perform this action");
+        }
+
+        enrollment.setEnrollmentStatus(status);
+        
+        if ("COMPLETED".equals(status)) {
+            enrollment.setCompletedAt(LocalDateTime.now());
+            enrollment.setCertificateEarned(true);
+            
+            emailService.sendCertificateEmail(
+                enrollment.getStudent().getEmail(),
+                enrollment.getStudent().getFirstName(),
+                enrollment.getCourse().getTitle()
+            );
+        }
+
+        Enrollment updatedEnrollment = enrollmentRepository.save(enrollment);
+        return mapToEnrollmentDTO(updatedEnrollment);
+    }
+
+    private EnrollmentDTO mapToEnrollmentDTO(Enrollment enrollment) {
         EnrollmentDTO dto = modelMapper.map(enrollment, EnrollmentDTO.class);
         dto.setStudentId(enrollment.getStudent().getId());
         dto.setStudentName(enrollment.getStudent().getFirstName() + " " + enrollment.getStudent().getLastName());

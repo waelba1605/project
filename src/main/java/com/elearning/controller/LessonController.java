@@ -1,7 +1,6 @@
 package com.elearning.controller;
 
 import com.elearning.dto.LessonDTO;
-import com.elearning.dto.LessonRequest;
 import com.elearning.service.LessonService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,9 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/lessons")
@@ -24,79 +21,43 @@ public class LessonController {
 
     @PostMapping
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> createLesson(@Valid @RequestBody LessonRequest lessonRequest) {
-        try {
-            LessonDTO lessonDTO = lessonService.createLesson(lessonRequest);
-            return ResponseEntity.status(HttpStatus.CREATED).body(lessonDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<LessonDTO> createLesson(@Valid @RequestBody LessonDTO lessonDTO) {
+        LessonDTO createdLesson = lessonService.createLesson(lessonDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdLesson);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getLessonById(@PathVariable Long id) {
-        try {
-            LessonDTO lessonDTO = lessonService.getLessonById(id);
-            return ResponseEntity.ok(lessonDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
+    public ResponseEntity<LessonDTO> getLessonById(@PathVariable Long id) {
+        LessonDTO lesson = lessonService.getLessonById(id);
+        return ResponseEntity.ok(lesson);
     }
 
     @GetMapping("/course/{courseId}")
-    public ResponseEntity<?> getLessonsByCourse(@PathVariable Long courseId) {
-        try {
-            List<LessonDTO> lessonDTOs = lessonService.getLessonsByCourse(courseId);
-            return ResponseEntity.ok(lessonDTOs);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<List<LessonDTO>> getLessonsByCourse(@PathVariable Long courseId) {
+        List<LessonDTO> lessons = lessonService.getLessonsByCourse(courseId);
+        return ResponseEntity.ok(lessons);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> updateLesson(@PathVariable Long id, @Valid @RequestBody LessonRequest lessonRequest) {
-        try {
-            LessonDTO lessonDTO = lessonService.updateLesson(id, lessonRequest);
-            return ResponseEntity.ok(lessonDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
-
-    @PutMapping("/{id}/publish")
-    @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
-    public ResponseEntity<?> publishLesson(@PathVariable Long id) {
-        try {
-            LessonDTO lessonDTO = lessonService.publishLesson(id);
-            return ResponseEntity.ok(lessonDTO);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<LessonDTO> updateLesson(
+            @PathVariable Long id,
+            @Valid @RequestBody LessonDTO lessonDTO) {
+        LessonDTO updatedLesson = lessonService.updateLesson(id, lessonDTO);
+        return ResponseEntity.ok(updatedLesson);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
     public ResponseEntity<?> deleteLesson(@PathVariable Long id) {
-        try {
-            lessonService.deleteLesson(id);
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Lesson deleted successfully");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+        lessonService.deleteLesson(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}/publish")
+    @PreAuthorize("hasRole('INSTRUCTOR') or hasRole('ADMIN')")
+    public ResponseEntity<LessonDTO> publishLesson(@PathVariable Long id) {
+        LessonDTO lesson = lessonService.publishLesson(id);
+        return ResponseEntity.ok(lesson);
     }
 }

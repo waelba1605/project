@@ -1,33 +1,39 @@
 package com.elearning.service;
 
-import com.elearning.dto.LessonProgressDTO;
-import com.elearning.model.entity.LessonProgress;
+import com.elearning.dto.ProgressDTO;
+import com.elearning.exception.ResourceNotFoundException;
+import com.elearning.exception.UnauthorizedException;
+import com.elearning.model.entity.Enrollment;
 import com.elearning.model.entity.Lesson;
+import com.elearning.model.entity.LessonProgress;
 import com.elearning.model.entity.User;
+import com.elearning.repository.EnrollmentRepository;
 import com.elearning.repository.LessonProgressRepository;
 import com.elearning.repository.LessonRepository;
 import com.elearning.repository.UserRepository;
 import com.elearning.security.UserPrincipal;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class ProgressService {
 
     @Autowired
-    private LessonProgressRepository progressRepository;
+    private LessonProgressRepository lessonProgressRepository;
 
     @Autowired
     private LessonRepository lessonRepository;
+
+    @Autowired
+    private EnrollmentRepository enrollmentRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -35,112 +41,95 @@ public class ProgressService {
     @Autowired
     private ModelMapper modelMapper;
 
-    private UserPrincipal getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return (UserPrincipal) authentication.getPrincipal();
-    }
-
-    public LessonProgressDTO markLessonAsCompleted(Long lessonId) {
-        UserPrincipal userPrincipal = getCurrentUser();
+    public ProgressDTO updateLessonProgress(ProgressDTO progressDTO) {
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         User student = userRepository.findById(userPrincipal.getId())
-            .orElseThrow(() -> new RuntimeException("Student not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
 
-        Lesson lesson = lessonRepository.findById(lessonId)
-            .orElseThrow(() -> new RuntimeException("Lesson not found"));
+        Lesson lesson = lessonRepository.findById(progressDTO.getLessonId())
+            .orElseThrow(() -> new ResourceNotFoundException("Lesson", "id", progressDTO.getLessonId()));
 
-        LessonProgress progress = progressRepository.findByStudentIdAndLessonId(student.getId(), lessonId)
-            .orElse(new LessonProgress());
+        LessonProgress progress = lessonProgressRepository.findByStudentIdAndLessonId(student.getId(), lesson.getId())
+            .orElse(LessonProgress.builder()
+                .student(student)
+                .lesson(lesson)
+                .progressPercentage(0)
+                .watchedDurationMinutes(0)
+                .isCompleted(false)
+                .build());
 
-        if (progress.getId() == null) {
-            progress.setStudent(student);
-            progress.setLesson(lesson);
+        if (progressDTO.getWatchedDurationMinutes() != null) {
+            progress.setWatchedDurationMinutes(progressDTO.getWatchedDurationMinutes());
         }
 
-        progress.setIsCompleted(true);
-        progress.setProgressPercentage(100);
-        progress.setCompletedAt(LocalDateTime.now());
-
-        LessonProgress savedProgress = progressRepository.save(progress);
-        return mapToDTO(savedProgress);
-    }
-
-    public LessonProgressDTO updateProgress(Long lessonId, Integer progressPercentage, Integer watchedDuration) {
-        UserPrincipal userPrincipal = getCurrentUser();
-        User student = userRepository.findById(userPrincipal.getId())
-            .orElseThrow(() -> new RuntimeException("Student not found"));
-
-        Lesson lesson = lessonRepository.findById(lessonId)
-            .orElseThrow(() -> new RuntimeException("Lesson not found"));
-
-        LessonProgress progress = progressRepository.findByStudentIdAndLessonId(student.getId(), lessonId)
-            .orElse(new LessonProgress());
-
-        if (progress.getId() == null) {
-            progress.setStudent(student);
-            progress.setLesson(lesson);
+        if (progressDTO.getProgressPercentage() != null) {
+            progress.setProgressPercentage(progressDTO.getProgressPercentage());
         }
 
-        progress.setProgressPercentage(progressPercentage);
-        if (watchedDuration != null) {
-            progress.setWatchedDurationMinutes(watchedDuration);
-        }
-
-        if (progressPercentage == 100) {
+        if (progressDTO.getProgressPercentage() >= 100) {
             progress.setIsCompleted(true);
             progress.setCompletedAt(LocalDateTime.now());
         }
 
-        LessonProgress savedProgress = progressRepository.save(progress);
-        return mapToDTO(savedProgress);
+        LessonProgress saved = lessonProgressRepository.save(progress);
+        return mapToProgressDTO(saved);
     }
 
-    public LessonProgressDTO getLessonProgress(Long lessonId) {
-        UserPrincipal userPrincipal = getCurrentUser();
-        LessonProgress progress = progressRepository.findByStudentIdAndLessonId(userPrincipal.getId(), lessonId)
-            .orElseThrow(() -> new RuntimeException("No progress found for this lesson"));
-        return mapToDTO(progress);
+    public ProgressDTO getLessonProgress(Long lessonId) {
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Lesson lesson = lessonRepository.findById(lessonId)
+            .orElseThrow(() -> new ResourceNotFoundException("Lesson", "id", lessonId));
+
+        LessonProgress progress = lessonProgressRepository.findByStudentIdAndLessonId(userPrincipal.getId(), lessonId)
+            .orElseThrow(() -> new ResourceNotFoundException("Progress", "lesson", lessonId));
+
+        return mapToProgressDTO(progress);
     }
 
-    public Map<String, Object> getCourseProgress(Long courseId) {
-        UserPrincipal userPrincipal = getCurrentUser();
+    public List<ProgressDTO> getCourseProgress(Long courseId) {
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         
-        // Get all lessons in the course
-        List<Lesson> lessons = lessonRepository.findByCourseIdOrderByLessonNumberAsc(courseId);
-        
-        if (lessons.isEmpty()) {
-            throw new RuntimeException("No lessons found in this course");
+        Enrollment enrollment = enrollmentRepository.findByStudentIdAndCourseId(userPrincipal.getId(), courseId)
+            .orElseThrow(() -> new ResourceNotFoundException("Enrollment", "course", courseId));
+
+        return enrollment.getCourse().getLessons().stream()
+            .map(lesson -> lessonProgressRepository.findByStudentIdAndLessonId(userPrincipal.getId(), lesson.getId())
+                .map(this::mapToProgressDTO)
+                .orElse(null))
+            .filter(dto -> dto != null)
+            .collect(Collectors.toList());
+    }
+
+    public Integer calculateEnrollmentProgress(Long enrollmentId) {
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Enrollment", "id", enrollmentId));
+
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!enrollment.getStudent().getId().equals(userPrincipal.getId())) {
+            throw new UnauthorizedException("You are not authorized to view this progress");
         }
 
-        // Calculate progress
-        int completedLessons = 0;
-        int totalDurationWatched = 0;
+        int totalLessons = enrollment.getCourse().getLessons().size();
+        if (totalLessons == 0) return 0;
 
-        for (Lesson lesson : lessons) {
-            var progress = progressRepository.findByStudentIdAndLessonId(userPrincipal.getId(), lesson.getId());
-            if (progress.isPresent() && progress.get().getIsCompleted()) {
-                completedLessons++;
-                totalDurationWatched += progress.get().getWatchedDurationMinutes();
-            }
-        }
+        long completedLessons = enrollment.getCourse().getLessons().stream()
+            .filter(lesson -> lessonProgressRepository.findByStudentIdAndLessonId(enrollment.getStudent().getId(), lesson.getId())
+                .map(LessonProgress::getIsCompleted)
+                .orElse(false))
+            .count();
 
-        double courseProgress = (completedLessons * 100.0) / lessons.size();
+        int progress = (int) ((completedLessons * 100) / totalLessons);
+        enrollment.setProgressPercentage(progress);
+        enrollmentRepository.save(enrollment);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("courseId", courseId);
-        response.put("totalLessons", lessons.size());
-        response.put("completedLessons", completedLessons);
-        response.put("progressPercentage", courseProgress);
-        response.put("totalDurationWatched", totalDurationWatched);
-
-        return response;
+        return progress;
     }
 
-    private LessonProgressDTO mapToDTO(LessonProgress progress) {
-        LessonProgressDTO dto = modelMapper.map(progress, LessonProgressDTO.class);
+    private ProgressDTO mapToProgressDTO(LessonProgress progress) {
+        ProgressDTO dto = modelMapper.map(progress, ProgressDTO.class);
         dto.setStudentId(progress.getStudent().getId());
-        dto.setStudentName(progress.getStudent().getFirstName() + " " + progress.getStudent().getLastName());
-        dto.setLessonId(progress.getLesson().getId());
         dto.setLessonTitle(progress.getLesson().getTitle());
+        dto.setTotalDurationMinutes(progress.getLesson().getDurationMinutes());
         return dto;
     }
 }

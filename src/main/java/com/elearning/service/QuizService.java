@@ -1,20 +1,24 @@
 package com.elearning.service;
 
 import com.elearning.dto.QuizDTO;
-import com.elearning.dto.QuizRequest;
-import com.elearning.model.entity.Quiz;
+import com.elearning.exception.ResourceNotFoundException;
+import com.elearning.exception.UnauthorizedException;
 import com.elearning.model.entity.Lesson;
-import com.elearning.repository.QuizRepository;
+import com.elearning.model.entity.Quiz;
 import com.elearning.repository.LessonRepository;
+import com.elearning.repository.QuizRepository;
+import com.elearning.security.UserPrincipal;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class QuizService {
 
     @Autowired
@@ -26,72 +30,69 @@ public class QuizService {
     @Autowired
     private ModelMapper modelMapper;
 
-    public QuizDTO createQuiz(QuizRequest quizRequest) {
-        Lesson lesson = lessonRepository.findById(quizRequest.getLessonId())
-            .orElseThrow(() -> new RuntimeException("Lesson not found"));
+    public QuizDTO createQuiz(QuizDTO quizDTO) {
+        Lesson lesson = lessonRepository.findById(quizDTO.getLessonId())
+            .orElseThrow(() -> new ResourceNotFoundException("Lesson", "id", quizDTO.getLessonId()));
 
-        Quiz quiz = new Quiz();
-        quiz.setTitle(quizRequest.getTitle());
-        quiz.setDescription(quizRequest.getDescription());
+        verifyInstructor(lesson.getCourse().getInstructor().getId());
+
+        Quiz quiz = modelMapper.map(quizDTO, Quiz.class);
         quiz.setLesson(lesson);
-        quiz.setPassingScore(quizRequest.getPassingScore());
-        quiz.setTimeLimitMinutes(quizRequest.getTimeLimitMinutes());
-        quiz.setShowCorrectAnswers(quizRequest.getShowCorrectAnswers());
         quiz.setIsPublished(false);
 
         Quiz savedQuiz = quizRepository.save(quiz);
-        return mapToDTO(savedQuiz);
+        return modelMapper.map(savedQuiz, QuizDTO.class);
     }
 
     public QuizDTO getQuizById(Long id) {
         Quiz quiz = quizRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Quiz not found"));
-        return mapToDTO(quiz);
+            .orElseThrow(() -> new ResourceNotFoundException("Quiz", "id", id));
+        return modelMapper.map(quiz, QuizDTO.class);
     }
 
     public List<QuizDTO> getQuizzesByLesson(Long lessonId) {
-        List<Quiz> quizzes = quizRepository.findByLessonId(lessonId);
-        return quizzes.stream()
-            .map(this::mapToDTO)
+        return quizRepository.findByLessonId(lessonId).stream()
+            .map(quiz -> modelMapper.map(quiz, QuizDTO.class))
             .collect(Collectors.toList());
     }
 
-    public QuizDTO updateQuiz(Long id, QuizRequest quizRequest) {
+    public QuizDTO updateQuiz(Long id, QuizDTO quizDTO) {
         Quiz quiz = quizRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Quiz not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Quiz", "id", id));
 
-        quiz.setTitle(quizRequest.getTitle());
-        quiz.setDescription(quizRequest.getDescription());
-        quiz.setPassingScore(quizRequest.getPassingScore());
-        quiz.setTimeLimitMinutes(quizRequest.getTimeLimitMinutes());
-        quiz.setShowCorrectAnswers(quizRequest.getShowCorrectAnswers());
-        quiz.setUpdatedAt(LocalDateTime.now());
+        verifyInstructor(quiz.getLesson().getCourse().getInstructor().getId());
+
+        if (quizDTO.getTitle() != null) quiz.setTitle(quizDTO.getTitle());
+        if (quizDTO.getDescription() != null) quiz.setDescription(quizDTO.getDescription());
+        if (quizDTO.getPassingScore() != null) quiz.setPassingScore(quizDTO.getPassingScore());
+        if (quizDTO.getTimeLimitMinutes() != null) quiz.setTimeLimitMinutes(quizDTO.getTimeLimitMinutes());
 
         Quiz updatedQuiz = quizRepository.save(quiz);
-        return mapToDTO(updatedQuiz);
-    }
-
-    public QuizDTO publishQuiz(Long id) {
-        Quiz quiz = quizRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Quiz not found"));
-
-        quiz.setIsPublished(true);
-        quiz.setUpdatedAt(LocalDateTime.now());
-
-        Quiz publishedQuiz = quizRepository.save(quiz);
-        return mapToDTO(publishedQuiz);
+        return modelMapper.map(updatedQuiz, QuizDTO.class);
     }
 
     public void deleteQuiz(Long id) {
         Quiz quiz = quizRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Quiz not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Quiz", "id", id));
+
+        verifyInstructor(quiz.getLesson().getCourse().getInstructor().getId());
         quizRepository.delete(quiz);
     }
 
-    private QuizDTO mapToDTO(Quiz quiz) {
-        QuizDTO dto = modelMapper.map(quiz, QuizDTO.class);
-        dto.setLessonId(quiz.getLesson().getId());
-        dto.setLessonTitle(quiz.getLesson().getTitle());
-        return dto;
+    public QuizDTO publishQuiz(Long id) {
+        Quiz quiz = quizRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Quiz", "id", id));
+
+        verifyInstructor(quiz.getLesson().getCourse().getInstructor().getId());
+        quiz.setIsPublished(true);
+        Quiz publishedQuiz = quizRepository.save(quiz);
+        return modelMapper.map(publishedQuiz, QuizDTO.class);
+    }
+
+    private void verifyInstructor(Long instructorId) {
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!userPrincipal.getId().equals(instructorId) && !userPrincipal.getAuthorities().toString().contains("ADMIN")) {
+            throw new UnauthorizedException("You are not authorized to perform this action");
+        }
     }
 }

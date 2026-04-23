@@ -1,7 +1,9 @@
 package com.elearning.service;
 
 import com.elearning.dto.CourseDTO;
-import com.elearning.dto.CourseRequest;
+import com.elearning.exception.DuplicateResourceException;
+import com.elearning.exception.ResourceNotFoundException;
+import com.elearning.exception.UnauthorizedException;
 import com.elearning.model.entity.Course;
 import com.elearning.model.entity.User;
 import com.elearning.repository.CourseRepository;
@@ -9,17 +11,16 @@ import com.elearning.repository.UserRepository;
 import com.elearning.security.UserPrincipal;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class CourseService {
 
     @Autowired
@@ -31,111 +32,112 @@ public class CourseService {
     @Autowired
     private ModelMapper modelMapper;
 
-    private UserPrincipal getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return (UserPrincipal) authentication.getPrincipal();
-    }
+    @Autowired
+    private EmailService emailService;
 
-    public CourseDTO createCourse(CourseRequest courseRequest) {
-        UserPrincipal userPrincipal = getCurrentUser();
-        User instructor = userRepository.findById(userPrincipal.getId())
-            .orElseThrow(() -> new RuntimeException("User not found"));
-
-        if (courseRepository.findByCourseCode(courseRequest.getCourseCode()).isPresent()) {
-            throw new RuntimeException("Course code already exists");
+    public CourseDTO createCourse(CourseDTO courseDTO) {
+        if (courseRepository.findByCourseCode(courseDTO.getCourseCode()).isPresent()) {
+            throw new DuplicateResourceException("Course", "courseCode", courseDTO.getCourseCode());
         }
 
-        Course course = new Course();
-        course.setTitle(courseRequest.getTitle());
-        course.setDescription(courseRequest.getDescription());
-        course.setCourseCode(courseRequest.getCourseCode());
-        course.setCategory(courseRequest.getCategory());
-        course.setLevel(courseRequest.getLevel());
-        course.setThumbnailUrl(courseRequest.getThumbnailUrl());
-        course.setDurationHours(courseRequest.getDurationHours());
-        course.setPrice(courseRequest.getPrice());
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User instructor = userRepository.findById(userPrincipal.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
+
+        Course course = modelMapper.map(courseDTO, Course.class);
         course.setInstructor(instructor);
         course.setIsPublished(false);
 
         Course savedCourse = courseRepository.save(course);
-        return mapToDTO(savedCourse);
+        return mapToCourseDTO(savedCourse);
     }
 
     public CourseDTO getCourseById(Long id) {
         Course course = courseRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Course not found"));
-        return mapToDTO(course);
+            .orElseThrow(() -> new ResourceNotFoundException("Course", "id", id));
+        return mapToCourseDTO(course);
     }
 
-    public Page<CourseDTO> getAllCourses(Pageable pageable, String category) {
-        Page<Course> courses;
-        if (category != null && !category.isEmpty()) {
-            courses = courseRepository.findAll(pageable).map(course -> course.getCategory().equals(category) ? course : null)
-                .map(course -> course != null ? course : new Course());
-            // Alternative implementation
-            List<Course> categoryList = courseRepository.findByCategory(category);
-            courses = courseRepository.findAll(pageable).map(course -> 
-                categoryList.contains(course) ? course : null
-            ).filter(course -> course != null && course.getId() != null);
-        } else {
-            courses = courseRepository.findAll(pageable);
-        }
-        return courses.map(this::mapToDTO);
-    }
-
-    public Page<CourseDTO> getPublishedCourses(Pageable pageable) {
-        List<Course> publishedCourses = courseRepository.findByIsPublishedTrue();
-        return courseRepository.findAll(pageable)
-            .map(course -> publishedCourses.contains(course) ? course : null)
-            .filter(course -> course != null && course.getId() != null)
-            .map(this::mapToDTO);
-    }
-
-    public List<CourseDTO> getCoursesByInstructor(Long instructorId) {
-        List<Course> courses = courseRepository.findByInstructorId(instructorId);
-        return courses.stream()
-            .map(this::mapToDTO)
+    public List<CourseDTO> getAllPublishedCourses() {
+        return courseRepository.findByIsPublishedTrue().stream()
+            .map(this::mapToCourseDTO)
             .collect(Collectors.toList());
     }
 
-    public CourseDTO updateCourse(Long id, CourseRequest courseRequest) {
-        Course course = courseRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Course not found"));
-
-        course.setTitle(courseRequest.getTitle());
-        course.setDescription(courseRequest.getDescription());
-        course.setCategory(courseRequest.getCategory());
-        course.setLevel(courseRequest.getLevel());
-        course.setThumbnailUrl(courseRequest.getThumbnailUrl());
-        course.setDurationHours(courseRequest.getDurationHours());
-        course.setPrice(courseRequest.getPrice());
-        course.setUpdatedAt(LocalDateTime.now());
-
-        Course updatedCourse = courseRepository.save(course);
-        return mapToDTO(updatedCourse);
+    public List<CourseDTO> getCoursesByCategory(String category) {
+        return courseRepository.findByCategory(category).stream()
+            .filter(Course::getIsPublished)
+            .map(this::mapToCourseDTO)
+            .collect(Collectors.toList());
     }
 
-    public CourseDTO publishCourse(Long id) {
+    public List<CourseDTO> getCoursesByInstructor(Long instructorId) {
+        return courseRepository.findByInstructorId(instructorId).stream()
+            .map(this::mapToCourseDTO)
+            .collect(Collectors.toList());
+    }
+
+    public CourseDTO updateCourse(Long id, CourseDTO courseDTO) {
         Course course = courseRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Course not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Course", "id", id));
 
-        course.setIsPublished(true);
-        course.setUpdatedAt(LocalDateTime.now());
+        verifyInstructor(course.getInstructor().getId());
 
-        Course publishedCourse = courseRepository.save(course);
-        return mapToDTO(publishedCourse);
+        if (courseDTO.getTitle() != null) course.setTitle(courseDTO.getTitle());
+        if (courseDTO.getDescription() != null) course.setDescription(courseDTO.getDescription());
+        if (courseDTO.getCategory() != null) course.setCategory(courseDTO.getCategory());
+        if (courseDTO.getLevel() != null) course.setLevel(courseDTO.getLevel());
+        if (courseDTO.getDurationHours() != null) course.setDurationHours(courseDTO.getDurationHours());
+        if (courseDTO.getPrice() != null) course.setPrice(courseDTO.getPrice());
+        if (courseDTO.getThumbnailUrl() != null) course.setThumbnailUrl(courseDTO.getThumbnailUrl());
+
+        Course updatedCourse = courseRepository.save(course);
+        return mapToCourseDTO(updatedCourse);
     }
 
     public void deleteCourse(Long id) {
         Course course = courseRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Course not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Course", "id", id));
+
+        verifyInstructor(course.getInstructor().getId());
         courseRepository.delete(course);
     }
 
-    private CourseDTO mapToDTO(Course course) {
+    public CourseDTO publishCourse(Long id) {
+        Course course = courseRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Course", "id", id));
+
+        verifyInstructor(course.getInstructor().getId());
+
+        course.setIsPublished(true);
+        Course publishedCourse = courseRepository.save(course);
+        return mapToCourseDTO(publishedCourse);
+    }
+
+    public CourseDTO unpublishCourse(Long id) {
+        Course course = courseRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Course", "id", id));
+
+        verifyInstructor(course.getInstructor().getId());
+
+        course.setIsPublished(false);
+        Course unpublishedCourse = courseRepository.save(course);
+        return mapToCourseDTO(unpublishedCourse);
+    }
+
+    private void verifyInstructor(Long instructorId) {
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!userPrincipal.getId().equals(instructorId) && !userPrincipal.getAuthorities().toString().contains("ADMIN")) {
+            throw new UnauthorizedException("You are not authorized to perform this action");
+        }
+    }
+
+    private CourseDTO mapToCourseDTO(Course course) {
         CourseDTO dto = modelMapper.map(course, CourseDTO.class);
         dto.setInstructorId(course.getInstructor().getId());
         dto.setInstructorName(course.getInstructor().getFirstName() + " " + course.getInstructor().getLastName());
+        dto.setLessonCount(course.getLessons().size());
+        dto.setEnrollmentCount(course.getEnrollments().size());
         return dto;
     }
 }
