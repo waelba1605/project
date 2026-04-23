@@ -1,0 +1,37 @@
+# Maven
+target/
+*.jar
+*.war
+*.ear
+*.rar
+.m2/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Spring Boot
+application-*.properties
+application-*.yml
+.env
+
+# Logs
+logs/
+*.log
+
+# Build
+build/
+dist/
+
+# Database
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db

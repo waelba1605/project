@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: elearning_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: elearning
+      MYSQL_USER: elearning
+      MYSQL_PASSWORD: elearning123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - elearning_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: elearning_phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: elearning
+      PMA_PASSWORD: elearning123
+      PMA_ROOT_PASSWORD: root
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
+    networks:
+      - elearning_network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  elearning_network:
+    driver: bridge
