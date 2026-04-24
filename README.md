@@ -1,280 +1,201 @@
-# E-Learning Platform
+# E-Learning Platform - Spring Boot Backend
 
-A complete E-Learning management platform built with Spring Boot 3.2 and MySQL 8.
+Plateforme complète d'apprentissage en ligne développée avec **Spring Boot 3.2.0** et **MySQL 8.0**
 
-## 📋 Features
+## 🎯 Fonctionnalités
 
-### User Management
-- ✅ User registration and authentication with JWT
-- ✅ Three user roles: Student, Instructor, Admin
-- ✅ User profile management
-- ✅ Spring Security with BCrypt password encryption
+- ✅ Authentification JWT
+- ✅ Gestion des utilisateurs et rôles
+- ✅ Gestion des cours
+- ✅ Système de notation
+- ✅ API REST documentée avec Swagger
+- ✅ Sécurité avec Spring Security
+- ✅ Validation des données
+- ✅ Envoi d'emails
 
-### Course Management
-- ✅ Create, read, update, delete courses
-- ✅ Course categorization and leveling
-- ✅ Course publication workflow
-- ✅ Instructor dashboard
+## 📋 Prérequis
 
-### Lesson Management
-- ✅ Structured lessons within courses
-- ✅ Video content support
-- ✅ Lesson numbering and ordering
-- ✅ Lesson content with rich text
+- **Java 17+**
+- **Maven 3.8+**
+- **MySQL 8.0+**
+- **Spring Tools Suite (STS)** ou tout autre IDE compatible
 
-### Quiz & Assessment
-- ✅ Create multiple choice quizzes
-- ✅ Question management
-- ✅ Automatic score calculation
-- ✅ Quiz attempt tracking
-- ✅ Performance analytics
+## ⚙️ Configuration MySQL
 
-### Student Progress
-- ✅ Course enrollment tracking
-- ✅ Lesson progress monitoring
-- ✅ Quiz results and scores
-- ✅ Certificate issuance
+### 1. Démarrer MySQL
 
-### API Documentation
-- ✅ Swagger/OpenAPI 3.0 integration
-- ✅ Interactive API documentation
-- ✅ Ready for frontend integration
-
-## 🛠️ Tech Stack
-
-- **Backend**: Spring Boot 3.2
-- **Database**: MySQL 8.0
-- **Security**: Spring Security + JWT
-- **ORM**: Hibernate/JPA
-- **API Documentation**: Springdoc OpenAPI
-- **Build Tool**: Maven
-- **Java Version**: 17
-
-## 📦 Dependencies
-
-```xml
-- Spring Boot Web
-- Spring Data JPA
-- Spring Security
-- MySQL Connector/J 8.0.33
-- JJWT 0.12.3 (JWT Authentication)
-- Lombok
-- ModelMapper
-- Validation API
-- Springdoc OpenAPI
-- Spring Mail
+**Windows:**
+```bash
+net start MySQL80
 ```
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Java 17+
-- Maven 3.6+
-- Docker & Docker Compose (for MySQL)
-- Git
-
-### Installation
-
-#### 1. Clone the Repository
-
+**Linux/Mac:**
 ```bash
-git clone https://github.com/waelba1605/project.git
-cd project
+brew services start mysql@8.0
+# ou
+sudo systemctl start mysql
 ```
 
-#### 2. Start MySQL with Docker
+### 2. Configuration de la base de données
 
-```bash
-docker-compose up -d
+#### Option A : Laissez Spring créer la base de données automatiquement
+La base `elearning` sera créée automatiquement au démarrage.
+
+#### Option B : Créer manuellement
+```sql
+CREATE DATABASE elearning CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE elearning;
 ```
 
-This will start:
-- **MySQL 8.0** on `localhost:3306`
-- **PhpMyAdmin** on `http://localhost:8081`
+### 3. Configuration des identifiants
 
-#### 3. Build the Project
+Le fichier `src/main/resources/application.yml` contient :
+```yaml
+Username: root
+Password: 123456
+Database: elearning
+Port: 3306
+Host: localhost
+```
+
+**Pour modifier les identifiants**, éditez le fichier `application.yml`.
+
+## 🚀 Démarrer le projet
+
+### Option 1 : Avec Maven (Terminal)
 
 ```bash
+# Compiler et télécharger les dépendances
 mvn clean install
-```
 
-#### 4. Run the Application
-
-```bash
+# Lancer l'application
 mvn spring-boot:run
 ```
 
-The application will start on `http://localhost:8080/api/v1`
+### Option 2 : Avec Spring Tools Suite
 
-## 📚 API Endpoints
+1. Ouvrez le projet dans **STS**
+2. Clic droit sur le projet → **Run As** → **Spring Boot App**
+3. Vérifiez la console pour les messages de démarrage
 
-### Authentication
+### Option 3 : Build et exécution JAR
 
 ```bash
-# Register a new user
-POST /auth/register
-{
-  "firstName": "John",
-  "lastName": "Doe",
-  "email": "john@example.com",
-  "password": "password123",
-  "role": "STUDENT"
-}
-
-# Login
-POST /auth/login
-{
-  "email": "john@example.com",
-  "password": "password123"
-}
+mvn clean package
+java -jar target/elearning-platform-1.0.0.jar
 ```
 
-## 🔐 Default Credentials
+## ✅ Vérifier la connexion
 
-### Database
-- **Host**: `localhost:3306`
-- **Database**: `elearning`
-- **Root User**: `root` / `root`
-- **App User**: `elearning` / `elearning123`
-
-### JWT Configuration
-- **Secret Key**: `mySecretKeyForJWTTokenGenerationAndValidationPleaseChangeIt123456789` (Change in production!)
-- **Expiration**: 24 hours (86400000 ms)
-
-## 📖 API Documentation
-
-Once the application is running, access Swagger UI:
+Après le démarrage, vérifiez dans la console :
 
 ```
-http://localhost:8080/api/v1/swagger-ui.html
+HikariPool-1 - Starting...
+HikariPool-1 - Start completed.
+E-Learning Platform started successfully!
 ```
 
-## 📁 Project Structure
+Si vous voyez ces messages, la connexion à MySQL est établie ! ✅
+
+## 📍 URLs d'accès
+
+- **API Backend** : `http://localhost:8080/api`
+- **Documentation Swagger/OpenAPI** : `http://localhost:8080/api/swagger-ui.html`
+- **Base de données** : `localhost:3306/elearning`
+
+## 📁 Structure du projet
 
 ```
-src/main/java/com/elearning/
-├── config/              # Spring configuration
-├── controller/          # REST API endpoints
-├── dto/                 # Data Transfer Objects
-├── model/
-│   └── entity/          # JPA Entities
-├── repository/          # Spring Data Repositories
-├── security/            # JWT and Security configs
-├── service/             # Business logic
-└── ElearningApplication.java
-
-src/main/resources/
-├── application.yml      # Application configuration
+com.elearning
+├── ElearningPlatformApplication.java    # Classe principale
+├── controller/                          # REST Controllers
+├── service/                             # Logique métier
+├── repository/                          # Accès données (JPA)
+├── model/                               # Entités JPA
+├── dto/                                 # Data Transfer Objects
+├── security/                            # Authentification JWT
+├── config/                              # Configurations
+└── exception/                           # Gestion d'erreurs
 ```
 
-## 🔄 Database Schema
+## 🔧 Dépendances principales
 
-### Tables
+- **Spring Boot Web** : API REST
+- **Spring Data JPA** : Accès base de données
+- **Spring Security** : Authentification/Autorisation
+- **JWT (jjwt)** : Tokens d'authentification
+- **MySQL Connector** : Driver MySQL
+- **Lombok** : Réduction du code boilerplate
+- **ModelMapper** : Mappage DTO/Entity
+- **Validation** : Validation des données
+- **Swagger/OpenAPI** : Documentation API interactive
+- **Spring Mail** : Envoi d'emails
 
-1. **users** - User accounts and profiles
-2. **courses** - Course information
-3. **lessons** - Course lessons
-4. **quizzes** - Quiz assessments
-5. **questions** - Quiz questions
-6. **question_options** - Multiple choice options
-7. **enrollments** - Student course enrollments
-8. **quiz_results** - Quiz attempt results
-9. **lesson_progress** - Student lesson progress
+## 🐛 Dépannage
 
-## 🔗 Relationships
+### "Connection refused" ou "Can't connect to MySQL"
 
-```
-User
-  ├── 1→N Courses (as Instructor)
-  ├── 1→N Enrollments (as Student)
-  ├── 1→N QuizResults
-  └── 1→N LessonProgress
+✓ Vérifiez que MySQL est en cours d'exécution
+✓ Vérifiez le port (3306)
+✓ Vérifiez les identifiants (root:123456)
 
-Course
-  ├── 1→N Lessons
-  └── 1→N Enrollments
+### "Database 'elearning' not found"
 
-Lesson
-  ├── 1→N Quizzes
-  └── 1→N LessonProgress
+✓ La base sera créée automatiquement au premier démarrage
+✓ Ou créez-la manuellement avec le SQL ci-dessus
 
-Quiz
-  ├── 1→N Questions
-  └── 1→N QuizResults
+### Port 8080 déjà utilisé
 
-Question
-  └── 1→N QuestionOptions
-```
-
-## 🔒 Security Features
-
-- ✅ JWT-based authentication
-- ✅ BCrypt password hashing
-- ✅ Role-based access control (RBAC)
-- ✅ CORS support
-- ✅ CSRF protection
-- ✅ Method-level security annotations
-
-## 📝 Environment Variables
-
+Modifiez le port dans `application.yml` :
 ```yaml
-spring.datasource.url=jdbc:mysql://localhost:3306/elearning
-spring.datasource.username=elearning
-spring.datasource.password=elearning123
-app.jwtSecret=your_secret_key_here
-app.jwtExpirationMs=86400000
+server:
+  port: 8081
 ```
 
-## 🐳 Docker Compose Services
+## 📝 Logs
 
-### MySQL
-- **Image**: `mysql:8.0`
-- **Port**: `3306`
-- **Volume**: `mysql_data`
+Les logs sont configurés pour afficher :
+- Les requêtes SQL
+- Les requêtes HTTP
+- Les erreurs de sécurité
 
-### PhpMyAdmin
-- **Image**: `phpmyadmin:latest`
-- **Port**: `8081`
-- **URL**: `http://localhost:8081`
+Niveau de log par défaut : **INFO** (changez en DEBUG pour plus de détails)
 
-## 📊 Database Initialization
+## 🔐 Sécurité
 
-The database schema is automatically created on application startup due to:
+- JWT pour l'authentification
+- Spring Security pour l'autorisation
+- Validation des données en entrée
+- CORS configuré pour le frontend
 
-```yaml
-spring.jpa.hibernate.ddl-auto=update
-```
+## 📚 Ressources utiles
 
-SQL init script is also provided in `init.sql` for manual setup.
+- [Spring Boot Documentation](https://spring.io/projects/spring-boot)
+- [Spring Data JPA Guide](https://spring.io/projects/spring-data-jpa)
+- [Spring Security Documentation](https://spring.io/projects/spring-security)
+- [MySQL Documentation](https://dev.mysql.com/doc/)
 
-## 🚀 Next Steps
+## 👨‍💻 Développement
 
-1. Implement Course Management endpoints
-2. Add Lesson CRUD operations
-3. Implement Quiz and Question management
-4. Add enrollment functionality
-5. Implement progress tracking
-6. Add file upload capability
-7. Integrate email notifications
-8. Add admin dashboard
+### Ajouter une nouvelle entité
 
-## 📄 License
+1. Créez une classe dans `model/`
+2. Annotez avec `@Entity` et `@Table`
+3. Créez une interface Repository
+4. Créez un Service et Controller
+5. Restart l'application
 
-MIT License - See LICENSE file for details
+### Utiliser Swagger
 
-## 👨‍💻 Author
+Visitez `http://localhost:8080/api/swagger-ui.html` pour :
+- Voir tous les endpoints
+- Tester les requêtes API
+- Consulter la documentation
 
-**Waelba1605**
+## 📄 Licence
 
-## 📧 Support
+Projet sous licence MIT
 
-For issues and questions, please create a GitHub issue in the repository.
+## ✉️ Support
 
-## 🔄 Version
-
-**Current Version**: 1.0.0
-
----
-
-**Happy Learning! 🎓**
+Pour toute question ou problème, veuillez créer une issue.

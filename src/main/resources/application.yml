@@ -1,45 +1,32 @@
 spring:
-  application:
-    name: elearning-platform
-
   datasource:
     url: jdbc:mysql://localhost:3306/elearning?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: elearning
-    password: elearning123
+    username: root
+    password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 20000
-      idle-timeout: 300000
-      max-lifetime: 1200000
-
+  
   jpa:
     hibernate:
       ddl-auto: update
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: true
         use_sql_comments: true
-    show-sql: false
-    open-in-view: false
-
-  mvc:
-    throw-exception-if-no-handler-found: true
-
-  web:
-    resources:
-      add-mappings: false
+  
+  application:
+    name: elearning-platform
+  
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      indent-output: true
 
 server:
   port: 8080
   servlet:
-    context-path: /api/v1
-
-app:
-  jwtSecret: mySecretKeyForJWTTokenGenerationAndValidationPleaseChangeIt123456789
-  jwtExpirationMs: 86400000
+    context-path: /api
 
 logging:
   level:
